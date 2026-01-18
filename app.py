@@ -149,7 +149,7 @@ def attractions_map(lat, lon):
 # ------------------- UI -------------------
 
 st.set_page_config(page_title="AI Travel Planner", layout="wide")
-st.title("🎓 Free AI Travel Planner for Students")
+st.title("🎓 AI Travel Planner for Students")
 
 col1, col2 = st.columns(2)
 with col1:

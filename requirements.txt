@@ -1,6 +1,5 @@
 streamlit
 transformers
-huggingface_hub
 folium
 streamlit-folium
 requests

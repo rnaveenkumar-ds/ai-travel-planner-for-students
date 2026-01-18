@@ -5,6 +5,7 @@ import requests
 from folium.plugins import MarkerCluster
 import time
 import random
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 # ------------------- BASIC SETUP -------------------
 st.set_page_config(page_title="AI Travel Planner", layout="wide")
@@ -12,6 +13,7 @@ st.title("🎓 AI Travel Planner for Students")
 
 # ------------------- SESSION STATE INIT -------------------
 defaults = {
+    "from_location": "",  # NEW: Added for starting location
     "destination": "",
     "days": 2,
     "budget": 3000,
@@ -19,7 +21,8 @@ defaults = {
     "plan": "",
     "show_hotels": False,
     "show_transport": False,
-    "show_attractions": False
+    "show_attractions": False,
+    "show_route": False  # NEW: Added for route map checkbox
 }
 
 for k, v in defaults.items():
@@ -30,22 +33,42 @@ for k, v in defaults.items():
 def reset_app():
     for k, v in defaults.items():
         st.session_state[k] = v
+    st.cache_data.clear()
 
 # ------------------- UTILITY FUNCTIONS -------------------
 @st.cache_data(show_spinner=False)
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(3))
 def overpass(query):
     try:
-        time.sleep(1)
+        time.sleep(2)
         r = requests.post(
             "https://overpass-api.de/api/interpreter",
             data=query,
-            timeout=30
+            timeout=45
         )
+        if r.status_code == 504:
+            st.warning("Overpass API is temporarily slow (504 Timeout). Using fallback data. Try again later or refresh.")
+            return []
+        r.raise_for_status()
         return r.json().get("elements", [])
-    except Exception:
+    except requests.exceptions.RequestException as e:
+        st.warning(f"API request failed: {e}. Using fallback data.")
+        return []
+    except Exception as e:
+        st.warning(f"Unexpected API error: {e}. Using fallback data.")
         return []
 
+@st.cache_data(show_spinner=False)
 def get_lat_lon(city):
+    if not city.strip():
+        return [20.5937, 78.9629]
+    try:
+        url = f"https://nominatim.openstreetmap.org/search?q={city}&format=json&limit=1"
+        data = requests.get(url, timeout=10).json()
+        if data:
+            return [float(data[0]['lat']), float(data[0]['lon'])]
+    except Exception:
+        pass
     locations = {
         "Goa": [15.4909, 73.8278],
         "Manali": [32.2396, 77.1887],
@@ -61,40 +84,42 @@ def get_lat_lon(city):
 
 # ------------------- REAL DATA -------------------
 @st.cache_data(show_spinner=False)
-def get_real_hotels(lat, lon, limit=6):
+def get_real_hotels(lat, lon, limit=5):
     query = f"""
     [out:json];
     (
-      node["tourism"="hotel"](around:5000,{lat},{lon});
-      node["tourism"="hostel"](around:5000,{lat},{lon});
+      node["tourism"="hotel"](around:3000,{lat},{lon});
+      node["tourism"="hostel"](around:3000,{lat},{lon});
     );
     out;
     """
     els = overpass(query)
-    return [e.get("tags", {}).get("name") for e in els if e.get("tags", {}).get("name")][:limit] or ["Local budget stays"]
+    return [e.get("tags", {}).get("name") for e in els if e.get("tags", {}).get("name")][:limit] or ["Budget hotels in the area"]
 
 @st.cache_data(show_spinner=False)
-def get_real_attractions(lat, lon, limit=12):
+def get_real_attractions(lat, lon, limit=10):
     query = f"""
     [out:json];
     (
-      node["tourism"="attraction"](around:5000,{lat},{lon});
-      node["historic"="monument"](around:5000,{lat},{lon});
-      node["leisure"="park"](around:5000,{lat},{lon});
+      node["tourism"="attraction"](around:3000,{lat},{lon});
+      node["historic"="monument"](around:3000,{lat},{lon});
+      node["leisure"="park"](around:3000,{lat},{lon});
     );
     out;
     """
     els = overpass(query)
-    return [e.get("tags", {}).get("name") for e in els if e.get("tags", {}).get("name")][:limit] or ["Local exploration"]
+    return [e.get("tags", {}).get("name") for e in els if e.get("tags", {}).get("name")][:limit] or ["Explore local sights and parks"]
 
 @st.cache_data(show_spinner=False)
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
 def get_weather(lat, lon):
     try:
         url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
         data = requests.get(url, timeout=10).json()
         w = data.get("current_weather", {})
         return f"🌡 {w.get('temperature','N/A')}°C | 💨 Wind {w.get('windspeed','N/A')} km/h"
-    except Exception:
+    except Exception as e:
+        st.warning(f"Weather API error: {e}. Weather unavailable.")
         return "Weather unavailable"
 
 # ------------------- MAP FUNCTIONS -------------------
@@ -102,9 +127,12 @@ def build_map(lat, lon, query, color, icon):
     m = folium.Map(location=[lat, lon], zoom_start=13)
     cluster = MarkerCluster().add_to(m)
     for e in overpass(query):
+        tags = e.get("tags", {})
+        popup = f"<b>{tags.get('name', 'Unknown')}</b><br>{tags.get('addr:street', '')}"
         folium.Marker(
             [e["lat"], e["lon"]],
-            popup=e.get("tags", {}).get("name", "Unknown"),
+            popup=popup,
+            tooltip=tags.get("name", "Unknown"),
             icon=folium.Icon(color=color, icon=icon)
         ).add_to(cluster)
     return m
@@ -112,31 +140,44 @@ def build_map(lat, lon, query, color, icon):
 def hotel_map(lat, lon):
     return build_map(
         lat, lon,
-        f'[out:json];node["tourism"~"hotel|hostel"](around:5000,{lat},{lon});out;',
+        f'[out:json];node["tourism"~"hotel|hostel"](around:3000,{lat},{lon});out;',
         "green", "home"
     )
 
 def transport_map(lat, lon):
     return build_map(
         lat, lon,
-        f'[out:json];node["amenity"="bus_station"](around:5000,{lat},{lon});out;',
+        f'[out:json];node["amenity"="bus_station"](around:3000,{lat},{lon});out;',
         "blue", "road"
     )
 
 def attraction_map(lat, lon):
     return build_map(
         lat, lon,
-        f'[out:json];node["tourism"="attraction"](around:5000,{lat},{lon});out;',
+        f'[out:json];node["tourism"="attraction"](around:3000,{lat},{lon});out;',
         "orange", "star"
     )
 
+# NEW: Route map from "from" to "destination"
+def route_map(from_lat, from_lon, to_lat, to_lon):
+    m = folium.Map(location=[(from_lat + to_lat) / 2, (from_lon + to_lon) / 2], zoom_start=6)
+    # Add markers for start and end
+    folium.Marker([from_lat, from_lon], popup="Starting Point", icon=folium.Icon(color="red", icon="play")).add_to(m)
+    folium.Marker([to_lat, to_lon], popup="Destination", icon=folium.Icon(color="green", icon="flag")).add_to(m)
+    # Draw a simple line (straight route)
+    folium.PolyLine([(from_lat, from_lon), (to_lat, to_lon)], color="blue", weight=5, opacity=0.7).add_to(m)
+    return m
+
 # ------------------- PLAN GENERATOR -------------------
-def generate_plan(dest, budget, days, members, lat, lon):
+def generate_plan(from_loc, dest, budget, days, members, lat, lon):  # UPDATED: Added from_loc parameter
     hotels = get_real_hotels(lat, lon)
     places = get_real_attractions(lat, lon)
-    per_day = int(budget / days / members)
+    weather = get_weather(lat, lon)
+    per_day = max(1, int(budget / days / members))
 
-    plan = f"📍 Destination: {dest}\n\n"
+    plan = f"📍 From: {from_loc} → To: {dest}\n🌤️ Weather at Destination: {weather}\n\n"  # UPDATED: Added "From → To"
+    if not hotels or not places:
+        plan += "⚠️ Note: Limited data available for this location. Results may be generic.\n\n"
     idx = 0
     for d in range(1, days + 1):
         plan += f"🗓 Day {d}\n"
@@ -151,15 +192,23 @@ def generate_plan(dest, budget, days, members, lat, lon):
     return plan
 
 # ------------------- UI -------------------
-col1, col2 = st.columns(2)
+st.info("ℹ️ Note: Data is fetched from free APIs, which may be slow or unavailable at times. If you see 'fallback data,' try refreshing or choosing a smaller area.")
+
+col1, col2, col3 = st.columns(3)  # UPDATED: Changed to 3 columns to fit new input
 with col1:
-    st.session_state.destination = st.text_input("📍 Destination", value=st.session_state.destination)
+    st.session_state.from_location = st.text_input("📍 From Location", value=st.session_state.from_location)  # NEW: Added input
+with col2:
+    st.session_state.destination = st.text_input("📍 To Destination", value=st.session_state.destination)
+with col3:
     st.session_state.days = st.number_input("📅 Days", 1, 20, st.session_state.days)
 
-with col2:
+col4, col5 = st.columns(2)
+with col4:
     st.session_state.budget = st.number_input("💰 Budget (₹)", 1000, step=500, value=st.session_state.budget)
+with col5:
     st.session_state.members = st.number_input("👥 Members", 1, 10, st.session_state.members)
 
+st.session_state.show_route = st.checkbox("🗺️ Show Route Map (From → To)", value=st.session_state.show_route)  # NEW: Added checkbox
 st.session_state.show_hotels = st.checkbox("🏨 Show Hotels Map", value=st.session_state.show_hotels)
 st.session_state.show_transport = st.checkbox("🚕 Show Transport Map", value=st.session_state.show_transport)
 st.session_state.show_attractions = st.checkbox("🎡 Show Attractions Map", value=st.session_state.show_attractions)
@@ -167,21 +216,23 @@ st.session_state.show_attractions = st.checkbox("🎡 Show Attractions Map", val
 colA, colB = st.columns(2)
 with colA:
     if st.button("✨ Generate Plan"):
-        if st.session_state.destination.strip():
-            msg = st.info("⏳ Please wait, we are creating your travel plan...")
-            time.sleep(random.randint(5, 10))
-            lat, lon = get_lat_lon(st.session_state.destination)
-            st.session_state.plan = generate_plan(
-                st.session_state.destination,
-                st.session_state.budget,
-                st.session_state.days,
-                st.session_state.members,
-                lat, lon
-            )
-            msg.empty()
-            st.success("✅ Travel plan generated successfully!")
+        if st.session_state.from_location.strip() and st.session_state.destination.strip():  # UPDATED: Require both locations
+            with st.spinner("⏳ Generating your travel plan..."):
+                try:
+                    to_lat, to_lon = get_lat_lon(st.session_state.destination)
+                    st.session_state.plan = generate_plan(
+                        st.session_state.from_location,  # NEW: Pass from_location
+                        st.session_state.destination,
+                        st.session_state.budget,
+                        st.session_state.days,
+                        st.session_state.members,
+                        to_lat, to_lon
+                    )
+                    st.success("✅ Travel plan generated successfully!")
+                except Exception as e:
+                    st.error(f"❌ Error generating plan: {e}. Try again or check inputs.")
         else:
-            st.warning("Please enter a destination")
+            st.warning("Please enter both 'From' and 'To' locations")  # UPDATED: New warning
 
 with colB:
     if st.button("🔄 Reset Planner"):
@@ -191,19 +242,28 @@ st.divider()
 
 # ------------------- OUTPUT -------------------
 if st.session_state.plan:
-    lat, lon = get_lat_lon(st.session_state.destination)
+    to_lat, to_lon = get_lat_lon(st.session_state.destination)
 
     st.subheader("📝 Travel Plan")
     st.text(st.session_state.plan)
 
+    if st.button("🔄 Refresh Data (if maps are empty)"):
+        st.cache_data.clear()
+        st.rerun()
+
+    if st.session_state.show_route:  # NEW: Display route map if checked
+        from_lat, from_lon = get_lat_lon(st.session_state.from_location)
+        st.subheader("🗺️ Route Map (From → To)")
+        st_folium(route_map(from_lat, from_lon, to_lat, to_lon), width=800, height=450, key="route_map")
+
     if st.session_state.show_hotels:
         st.subheader("🏨 Hotels Map")
-        st_folium(hotel_map(lat, lon), width=800, height=450, key="hotels_map")
+        st_folium(hotel_map(to_lat, to_lon), width=800, height=450, key="hotels_map")
 
     if st.session_state.show_transport:
         st.subheader("🚕 Transport Map")
-        st_folium(transport_map(lat, lon), width=800, height=450, key="transport_map")
+        st_folium(transport_map(to_lat, to_lon), width=800, height=450, key="transport_map")
 
     if st.session_state.show_attractions:
         st.subheader("🎡 Attractions Map")
-        st_folium(attraction_map(lat, lon), width=800, height=450, key="attractions_map")
+        st_folium(attraction_map(to_lat, to_lon), width=800, height=450, key="attractions_map")

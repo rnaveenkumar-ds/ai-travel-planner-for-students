@@ -168,4 +168,33 @@ streamlit run app.py
 
 * OpenStreetMap Community
 * Streamlit Team
+<<<<<<< HEAD
 * Folium Contributors
+=======
+* Folium Contributors
+  
+---
+
+## 🔮 Future Scope
+
+While the **AI Travel Planner for Students** is fully functional and helpful, there are several ways it can be **enhanced and expanded** in the future:
+
+* 🌐 **Global Destination Support** – Automatically detect and plan trips for **any city worldwide**.
+* 🧭 **Route & Distance Optimization** – Suggest **shortest routes** between attractions to save time and money.
+* 📊 **Budget Analytics** – Provide **charts and graphs** for daily and overall spending.
+* 🏕 **Category-Based Travel** – Personalized itineraries for **adventure, cultural, or relaxation trips**.
+* 🤖 **AI-Powered Recommendations** – Use ML or LLMs to suggest **places, hotels, and activities** based on user preferences.
+* 📱 **Mobile-Friendly UI** – Optimized interface for **smartphones and tablets**.
+* 🌦 **Dynamic Weather Integration** – Incorporate **forecast-based activity suggestions**.
+* 🚌 **Transport Routing** – Include **bus, train, or metro routes** with estimated travel times.
+
+---
+
+## 📝 Conclusion
+
+The **AI Travel Planner for Students** is a **lightweight, interactive, and fully free tool** that simplifies trip planning for students. By integrating **real-world data, interactive maps, and personalized day-wise itineraries**, it allows users to:
+
+* Save time and reduce stress while planning trips
+* Optimize budget per person and per day
+* Explore attractions, hotels, and transport options with ease
+>>>>>>> a47fb5663b5560a5874c229b3dd62bdf700c0352

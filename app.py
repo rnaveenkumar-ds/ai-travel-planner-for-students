@@ -35,8 +35,9 @@ def reset_app():
 @st.cache_data(show_spinner=False)
 def overpass(query):
     try:
+        time.sleep(1)
         r = requests.post(
-            "http://overpass-api.de/api/interpreter",
+            "https://overpass-api.de/api/interpreter",
             data=query,
             timeout=30
         )
@@ -145,6 +146,7 @@ def generate_plan(dest, budget, days, members, lat, lon):
         plan += f"🌆 Evening: {places[(idx+2) % len(places)]}\n"
         plan += f"💰 Estimated Spend (per person): ₹{per_day}\n\n"
         idx += 3
+
     plan += "💡 Tips:\n- Use public transport\n- Start early\n- Carry student ID\n"
     return plan
 
@@ -166,14 +168,8 @@ colA, colB = st.columns(2)
 with colA:
     if st.button("✨ Generate Plan"):
         if st.session_state.destination.strip():
-            # Show immediate message
-            message = st.info("⏳ Please wait, we are creating your travel plan...")
-            
-            # Simulate AI thinking
-            wait_time = random.randint(5, 10)
-            time.sleep(wait_time)
-            
-            # Generate plan
+            msg = st.info("⏳ Please wait, we are creating your travel plan...")
+            time.sleep(random.randint(5, 10))
             lat, lon = get_lat_lon(st.session_state.destination)
             st.session_state.plan = generate_plan(
                 st.session_state.destination,
@@ -182,9 +178,7 @@ with colA:
                 st.session_state.members,
                 lat, lon
             )
-            
-            # Remove message and show success
-            message.empty()
+            msg.empty()
             st.success("✅ Travel plan generated successfully!")
         else:
             st.warning("Please enter a destination")
@@ -204,12 +198,12 @@ if st.session_state.plan:
 
     if st.session_state.show_hotels:
         st.subheader("🏨 Hotels Map")
-        st_folium(hotel_map(lat, lon), width=800, height=450)
+        st_folium(hotel_map(lat, lon), width=800, height=450, key="hotels_map")
 
     if st.session_state.show_transport:
         st.subheader("🚕 Transport Map")
-        st_folium(transport_map(lat, lon), width=800, height=450)
+        st_folium(transport_map(lat, lon), width=800, height=450, key="transport_map")
 
     if st.session_state.show_attractions:
         st.subheader("🎡 Attractions Map")
-        st_folium(attraction_map(lat, lon), width=800, height=450)
+        st_folium(attraction_map(lat, lon), width=800, height=450, key="attractions_map")

@@ -2,118 +2,129 @@ import streamlit as st
 import folium
 from streamlit_folium import st_folium
 import requests
+from folium.plugins import MarkerCluster
+import time
 
-# PAGE CONFIG
-st.set_page_config(page_title="AI Travel Planner", layout="wide")
+# ------------------- FUNCTIONS -------------------
 
-# ---------------- AI TRAVEL PLAN ----------------
+@st.cache_data
+def get_ai_activities(dest, budget):
+    activities_map = {
+        "manali": ["Hike to Rohtang Pass (if budget allows)", "Visit Hadimba Temple", "Explore local markets"],
+        "jaipur": ["Visit Amber Fort", "Stroll through City Palace", "Shop at Johari Bazaar"],
+        "delhi": ["Explore Red Fort", "Visit India Gate", "Try street food at Chandni Chowk"],
+        "agra": ["See Taj Mahal at sunrise", "Visit Agra Fort", "Local rickshaw tours"],
+        "pondicherry": ["Relax on Auroville Beach", "Visit French Quarter", "Explore Sri Aurobindo Ashram"],
+        "goa": ["Beach hopping", "Visit Basilica of Bom Jesus", "Water sports if budget permits"],
+    }
+    base = activities_map.get(dest.lower(), ["Explore local attractions", "Visit markets", "Enjoy nature walks"])
+    if budget < 1000:
+        return ", ".join(base[:2])
+    return ", ".join(base)
+
+@st.cache_data
 def generate_travel_plan(destination, total_budget, days, members):
-    """
-    Generates a structured day-by-day student travel plan with:
-    - Hotel suggestion
-    - Transportation
-    - Food budget
-    - Tips
-    """
+    try:
+        destinations = [d.strip() for d in destination.split(",") if d.strip()]
+        if not destinations:
+            return "❌ Please enter at least one valid destination."
 
-    budget_per_person_per_day = total_budget / days / members
+        budget_per_person_per_day = total_budget / days / members
+        plan_text = f"📍 Destination(s): {', '.join(destinations)}\n\n"
+        plan_text += "🤖 AI-Generated Insights: Tailored for students (budget + adventure + culture).\n\n"
 
-    # Define hotel categories based on per person per day budget
-    if budget_per_person_per_day < 1000:
-        hotel_type = "Budget hostel/hotel"
-        hotel_cost = 800 * members
-    elif budget_per_person_per_day <= 3000:
-        hotel_type = "Mid-range hotel"
-        hotel_cost = 2000 * members
-    else:
-        hotel_type = "Luxury hotel"
-        hotel_cost = 4000 * members
+        day = 1
+        for dest in destinations:
+            dest_days = max(1, days // len(destinations))
+            for _ in range(dest_days):
+                if day > days:
+                    break
+                # Hotel suggestion
+                if budget_per_person_per_day < 1000:
+                    hotel_type = "Budget hostel (dorm beds)"
+                    hotel_cost = 600 * members
+                elif budget_per_person_per_day <= 3000:
+                    hotel_type = "Mid-range hotel (private rooms)"
+                    hotel_cost = 1800 * members
+                else:
+                    hotel_type = "Luxury hotel (resorts)"
+                    hotel_cost = 3500 * members
 
-    # Transportation cost logic
-    transport_cost_per_day = 300 * members  # local buses, scooty
-    food_cost_per_day = budget_per_person_per_day * members * 0.3  # 30% for food
+                transport_cost = 400 * members
+                food_cost = int(budget_per_person_per_day * 0.4 * members)
+                activities = get_ai_activities(dest, budget_per_person_per_day)
 
-    # Generate day-wise plan
-    plan_text = f"📍 Destination: {destination}\n\n"
-    for day in range(1, days + 1):
-        plan_text += f"🗓 Day {day}:\n"
-        plan_text += f"- Stay at: {hotel_type} (₹{hotel_cost})\n"
-        plan_text += f"- Transportation: Local buses or rented scooty (₹{transport_cost_per_day})\n"
-        plan_text += f"- Food: Budget meals and local cafes (₹{int(food_cost_per_day)})\n"
-        plan_text += f"- Activities: Explore local attractions, markets, and beaches\n"
-        plan_text += "\n"
+                plan_text += f"🗓 Day {day} ({dest}):\n"
+                plan_text += f"- 🏨 Stay: {hotel_type} (₹{hotel_cost})\n"
+                plan_text += f"- 🚕 Transport: Local buses/trains/rented vehicles (₹{transport_cost})\n"
+                plan_text += f"- 🍲 Food: Street food/cafes (₹{food_cost})\n"
+                plan_text += f"- 🎉 Activities: {activities}\n\n"
+                day += 1
 
-    # Summary
-    total_food = int(food_cost_per_day * days)
-    total_transport = transport_cost_per_day * days
-    plan_text += f"💰 Estimated total cost:\n- Hotel: ₹{hotel_cost * days}\n- Transport: ₹{total_transport}\n- Food: ₹{total_food}\n"
-    plan_text += f"Tips: Use public transport, eat local street food, and book budget hotels early.\n"
+        total_hotel = sum([600 if budget_per_person_per_day < 1000 else 1800 if budget_per_person_per_day <= 3000 else 3500 for _ in range(days)]) * members
+        total_transport = 400 * members * days
+        total_food = int(budget_per_person_per_day * 0.4 * members * days)
+        total_estimated = total_hotel + total_transport + total_food
 
-    return plan_text
+        plan_text += f"💰 Estimated Total Cost (₹{total_estimated}):\n- Hotel: ₹{total_hotel}\n- Transport: ₹{total_transport}\n- Food: ₹{total_food}\n"
+        plan_text += "💡 Tips: Book via apps for discounts, use student IDs, stay hydrated, respect local customs.\n"
+        return plan_text
 
-# ---------------- WEATHER ----------------
+    except Exception as e:
+        return f"❌ Error generating plan: {e}"
+
+@st.cache_data
 def get_weather(lat, lon):
     try:
         url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
         data = requests.get(url, timeout=10).json()
         w = data.get("current_weather", {})
-        return f"🌡 {w.get('temperature')}°C | 💨 {w.get('windspeed')} km/h"
-    except:
+        temp = w.get("temperature", "N/A")
+        wind = w.get("windspeed", "N/A")
+        return f"🌡 {temp}°C | 💨 Wind: {wind} km/h"
+    except Exception:
         return "Weather unavailable"
 
-# ---------------- OVERPASS API ----------------
+@st.cache_data
 def overpass(query):
-    url = "http://overpass-api.de/api/interpreter"
     try:
-        response = requests.post(url, data=query, timeout=30)
-        if response.status_code == 200 and response.text.strip():
-            try:
-                return response.json().get("elements", [])
-            except ValueError:
-                return []
-        return []
-    except Exception as e:
+        response = requests.post("http://overpass-api.de/api/interpreter", data=query, timeout=30)
+        data = response.json()
+        return data.get("elements", [])
+    except Exception:
         return []
 
-# ---------------- HOTEL MAP ----------------
-def hotel_map(lat, lon, budget_per_day):
+def create_map(lat, lon, query, color="blue", icon="info-sign", empty_msg="No data found"):
     m = folium.Map(location=[lat, lon], zoom_start=13)
+    cluster = MarkerCluster().add_to(m)
+    try:
+        elements = overpass(query)
+        if not elements:
+            folium.Marker([lat, lon], popup=empty_msg, icon=folium.Icon(color="gray")).add_to(cluster)
+        for e in elements:
+            name = e.get("tags", {}).get("name", "Unnamed")
+            folium.Marker([e["lat"], e["lon"]], popup=name, icon=folium.Icon(color=color, icon=icon)).add_to(cluster)
+    except Exception:
+        folium.Marker([lat, lon], popup="Error loading map", icon=folium.Icon(color="gray")).add_to(cluster)
+    return m
 
+@st.cache_data
+def hotel_map(lat, lon, budget_per_day):
     query = f"""
-    [out:json];
+    [out:json][timeout:10];
     (
-      node["tourism"="hotel"](around:3000,{lat},{lon});
-      node["tourism"="hostel"](around:3000,{lat},{lon});
+      node["tourism"="hotel"](around:5000,{lat},{lon});
+      node["tourism"="hostel"](around:5000,{lat},{lon});
     );
     out;
     """
+    color = "green" if budget_per_day < 1000 else "blue" if budget_per_day <= 3000 else "red"
+    return create_map(lat, lon, query, color=color, icon="home", empty_msg="No hotels found nearby.")
 
-    hotels = overpass(query)
-
-    for h in hotels:
-        name = h.get("tags", {}).get("name", "Hotel")
-
-        if budget_per_day < 1000:
-            color, label = "green", "Budget"
-        elif budget_per_day <= 3000:
-            color, label = "blue", "Mid-range"
-        else:
-            color, label = "red", "Luxury"
-
-        folium.Marker(
-            [h["lat"], h["lon"]],
-            popup=f"{name} ({label})",
-            icon=folium.Icon(color=color, icon="home")
-        ).add_to(m)
-
-    return m
-
-# ---------------- TRANSPORT MAP ----------------
+@st.cache_data
 def transport_map(lat, lon):
-    m = folium.Map(location=[lat, lon], zoom_start=13)
-
     query = f"""
-    [out:json];
+    [out:json][timeout:10];
     (
       node["amenity"="bus_station"](around:5000,{lat},{lon});
       node["railway"="station"](around:5000,{lat},{lon});
@@ -121,75 +132,86 @@ def transport_map(lat, lon):
     );
     out;
     """
+    return create_map(lat, lon, query, color="green", icon="road", empty_msg="Check local transport apps.")
 
-    places = overpass(query)
+@st.cache_data
+def attractions_map(lat, lon):
+    query = f"""
+    [out:json][timeout:10];
+    (
+      node["tourism"="attraction"](around:5000,{lat},{lon});
+      node["historic"="monument"](around:5000,{lat},{lon});
+    );
+    out;
+    """
+    return create_map(lat, lon, query, color="orange", icon="star", empty_msg="Explore nearby attractions.")
 
-    for p in places:
-        name = p.get("tags", {}).get("name", "Transport")
-        tags = p.get("tags", {})
+# ------------------- UI -------------------
 
-        if tags.get("amenity") == "bus_station":
-            icon, color = "bus", "green"
-        elif tags.get("railway") == "station":
-            icon, color = "train", "blue"
-        else:
-            icon, color = "plane", "red"
-
-        folium.Marker(
-            [p["lat"], p["lon"]],
-            popup=name,
-            icon=folium.Icon(color=color, icon=icon)
-        ).add_to(m)
-
-    return m
-
-# ---------------- UI ----------------
+st.set_page_config(page_title="AI Travel Planner", layout="wide")
 st.title("🎓 Free AI Travel Planner for Students")
 
-destination = st.text_input("📍 Destination", "Goa")
-budget = st.number_input("💰 Total Budget (INR)", min_value=1000, value=5000)
-days = st.number_input("📅 Number of Days", min_value=1, value=3)
-members = st.number_input("👥 Members", min_value=1, value=2)
+col1, col2 = st.columns(2)
+with col1:
+    destination = st.text_input("📍 Destination(s)", value="")
+    days = st.number_input("📅 Number of Days", min_value=1, max_value=30, value=1)
+with col2:
+    budget = st.number_input("💰 Total Budget (INR)", min_value=1000, value=1000)
+    members = st.number_input("👥 Members", min_value=1, max_value=10, value=1)
 
-show_hotels = st.checkbox("🏨 Show Hotel Map (Cheap → Luxury)")
+show_hotels = st.checkbox("🏨 Show Hotel Map")
 show_transport = st.checkbox("🚕 Show Transportation Map")
+show_attractions = st.checkbox("🎡 Show Attractions Map")
 
-# Session state for output
+# Session state
 if "plan" not in st.session_state:
     st.session_state.plan = ""
 
 if st.button("✨ Generate Plan"):
-    st.session_state.plan = generate_travel_plan(
-        destination, budget, days, members
-    )
+    with st.spinner("Generating plan..."):
+        time.sleep(1)
+        st.session_state.plan = generate_travel_plan(destination, budget, int(days), int(members))
+
+if st.button("🔄 Reset"):
+    st.session_state.plan = ""
+    st.write("✅ Reset complete! Please refresh the page if needed.")
+    st.stop()  # Stops further execution safely
+
+st.markdown("---")
+
+# ------------------- DISPLAY -------------------
 
 if st.session_state.plan:
-    # Coordinates
+    # Default location dict
     locations = {
         "Goa": [15.4909, 73.8278],
         "Manali": [32.2396, 77.1887],
-        "Jaipur": [26.9124, 75.7873]
+        "Jaipur": [26.9124, 75.7873],
+        "Delhi": [28.7041, 77.1025],
+        "Agra": [27.1767, 78.0081],
+        "Pondicherry": [11.9139, 79.8145],
+        "Mumbai": [19.0760, 72.8777],
+        "Kolkata": [22.5726, 88.3639],
+        "Chennai": [13.0827, 80.2707],
     }
-    lat, lon = locations.get(destination, [20.5937, 78.9629])
+    first_dest = destination.split(",")[0].strip()
+    lat, lon = locations.get(first_dest, [20.5937, 78.9629])
+    budget_per_person_per_day = budget / days / members
 
-    st.subheader("📝 AI Travel Plan")
-    st.write(st.session_state.plan)
+    with st.expander("📝 AI Travel Plan", expanded=True):
+        st.write(st.session_state.plan)
 
-    st.subheader("🌤 Weather")
-    st.success(get_weather(lat, lon))
-
-    budget_per_day = budget / days
+    with st.expander("🌤 Weather", expanded=True):
+        st.success(get_weather(lat, lon))
 
     if show_hotels:
-        st.subheader("🏨 Hotels (Based on Budget)")
-        try:
-            st_folium(hotel_map(lat, lon, budget_per_day), width=700, height=450)
-        except Exception as e:
-            st.warning("Hotel map unavailable - API issue")
+        with st.expander("🏨 Hotels", expanded=True):
+            st_folium(hotel_map(lat, lon, budget_per_person_per_day), width=700, height=450)
 
     if show_transport:
-        st.subheader("🚕 Transportation Options")
-        try:
+        with st.expander("🚕 Transportation", expanded=True):
             st_folium(transport_map(lat, lon), width=700, height=450)
-        except Exception as e:
-            st.warning("Transport map unavailable - API issue")
+
+    if show_attractions:
+        with st.expander("🎡 Attractions", expanded=True):
+            st_folium(attractions_map(lat, lon), width=700, height=450)

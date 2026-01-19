@@ -34,11 +34,14 @@ for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ================= RESET =================
+# ================= RESET (FIXED) =================
 def reset_app():
-    for k, v in defaults.items():
-        st.session_state[k] = v
+    # We delete keys instead of assigning them to avoid StreamlitAPIException
+    for k in list(st.session_state.keys()):
+        if k in defaults:
+            del st.session_state[k]
     st.cache_data.clear()
+    st.rerun()
 
 # ================= API HELPERS =================
 @st.cache_data(show_spinner=False)
@@ -179,7 +182,6 @@ def get_food_places(lat, lon):
     budget = list(budget_set)
     premium = list(premium_set)
     
-    # UPDATED: Limit to 2 budget and 1 premium item for a clean list of 2-3 items
     return budget[:2] if budget else ["Street Food"], premium[:1] if premium else ["Popular Restaurant"]
 
 def build_map(lat, lon, query, color, icon, fallback_names=None):
@@ -344,7 +346,6 @@ with col_control_right:
 
     if st.button("🔄 Reset App", use_container_width=True):
         reset_app()
-        st.rerun()
 
 if st.session_state.plan:
     st.markdown("---")

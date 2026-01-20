@@ -98,6 +98,7 @@ def get_wikidata_places(lat, lon, radius=50000, limit=10):
 
 @st.cache_data(show_spinner=False)
 def get_real_places(lat, lon, limit=12):
+    # COMPREHENSIVE QUERY (Matches Map Query now)
     query = f"""
     [out:json][timeout:30];
     (
@@ -139,10 +140,11 @@ def get_real_places(lat, lon, limit=12):
 
 @st.cache_data(show_spinner=False)
 def get_real_hotels(lat, lon, limit=3):
+    # COMPREHENSIVE QUERY (Includes guest_house, motel, hostel)
     query = f"""
     [out:json][timeout:30];
     (
-      node["tourism"~"hotel|hostel"](around:50000,{lat},{lon});
+      node["tourism"~"hotel|hostel|guest_house|motel"](around:50000,{lat},{lon});
     );
     out;
     """
@@ -187,7 +189,12 @@ def get_food_places(lat, lon):
 def build_map(lat, lon, query, color, icon, fallback_names=None):
     m = folium.Map(location=[lat, lon], zoom_start=12)
     cluster = MarkerCluster().add_to(m)
-    elements = overpass(query)
+    
+    # Try to fetch data
+    try:
+        elements = overpass(query)
+    except:
+        elements = []
 
     if elements:
         for e in elements:
@@ -200,6 +207,7 @@ def build_map(lat, lon, query, color, icon, fallback_names=None):
                     icon=folium.Icon(color=color, icon=icon)
                 ).add_to(cluster)
     elif fallback_names:
+        # If API fails or returns empty, show fallback markers so map isn't blank
         for i, name in enumerate(fallback_names):
             folium.Marker(
                 [lat + i * 0.01, lon + i * 0.01],
@@ -217,19 +225,33 @@ def build_map(lat, lon, query, color, icon, fallback_names=None):
     return m
 
 def hotel_map(lat, lon):
+    # USE SAME QUERY AS GET_REAL_HOTELS (Comprehensive)
     return build_map(lat, lon,
-        f'[out:json];node["tourism"~"hotel|hostel"](around:50000,{lat},{lon});out;',
-        "green", "home", ["City Hotel"])
+        f'[out:json];node["tourism"~"hotel|hostel|guest_house|motel"](around:50000,{lat},{lon});out;',
+        "green", "home", ["City Hotel", "Budget Inn", "Guest House"])
 
 def transport_map(lat, lon):
+    # EXPANDED QUERY: Bus Station, Bus Stop, Taxi Stand
     return build_map(lat, lon,
-        f'[out:json];node["amenity"="bus_station"](around:50000,{lat},{lon});out;',
-        "blue", "road", ["Bus Station"])
+        f'[out:json];node["amenity"~"bus_station|bus_stop|taxi"](around:50000,{lat},{lon});out;',
+        "blue", "road", ["Bus Station", "Bus Stop", "Taxi Stand"])
 
 def attraction_map(lat, lon):
-    return build_map(lat, lon,
-        f'[out:json];node["tourism"="attraction"](around:50000,{lat},{lon});out;',
-        "orange", "star", ["Tourist Spot"])
+    # USE SAME COMPREHENSIVE QUERY AS GET_REAL_PLACES
+    # This fixes the issue where text showed "Hall of Fame" but map didn't.
+    query = f"""
+    [out:json][timeout:30];
+    (
+      node["tourism"="attraction"](around:50000,{lat},{lon});
+      node["historic"~"monument|castle|ruins"](around:50000,{lat},{lon});
+      node["leisure"="park"](around:50000,{lat},{lon});
+      node["tourism"="museum"](around:50000,{lat},{lon});
+      node["tourism"="gallery"](around:50000,{lat},{lon});
+      node["amenity"="theatre"](around:50000,{lat},{lon});
+    );
+    out;
+    """
+    return build_map(lat, lon, query, "orange", "star", ["City Park", "Museum", "Historic Site"])
 
 def route_map(flat, flon, tlat, tlon):
     m = folium.Map(location=[(flat + tlat) / 2, (flon + tlon) / 2], zoom_start=6)
@@ -352,21 +374,43 @@ if st.session_state.plan:
     st.markdown(st.session_state.plan)
     st.markdown("---")
 
+    st.warning("⚠️ **Note:** We use **Free Public APIs** (Overpass/OSM) for maps. These APIs have usage limits. If a map fails to load, appears empty, or is slow, please use the **🔄 Refresh** button next to it.")
+
     to_lat, to_lon = get_lat_lon(st.session_state.destination)
     from_lat, from_lon = get_lat_lon(st.session_state.from_location)
 
     if show_route:
-        st.subheader("🗺️ Route Map")
-        st_folium(route_map(from_lat, from_lon, to_lat, to_lon), width=1000, height=450)
+        col_title_route, col_btn_route = st.columns([4, 1])
+        with col_title_route:
+            st.subheader("🗺️ Route Map")
+        with col_btn_route:
+            if st.button("🔄", key="refresh_route_btn"):
+                st.session_state.route += 1
+        st_folium(route_map(from_lat, from_lon, to_lat, to_lon), key=f"route_{st.session_state.route}", width=1000, height=450)
 
     if show_hotels:
-        st.subheader("🏨 Nearby Hotels")
-        st_folium(hotel_map(to_lat, to_lon), width=1000, height=450)
+        col_title_hotels, col_btn_hotels = st.columns([4, 1])
+        with col_title_hotels:
+            st.subheader("🏨 Nearby Hotels")
+        with col_btn_hotels:
+            if st.button("🔄", key="refresh_hotels_btn"):
+                st.session_state.hotels += 1
+        st_folium(hotel_map(to_lat, to_lon), key=f"hotels_{st.session_state.hotels}", width=1000, height=450)
 
     if show_transport:
-        st.subheader("🚕 Transport Hubs")
-        st_folium(transport_map(to_lat, to_lon), width=1000, height=450)
+        col_title_transport, col_btn_transport = st.columns([4, 1])
+        with col_title_transport:
+            st.subheader("🚕 Transport Hubs")
+        with col_btn_transport:
+            if st.button("🔄", key="refresh_transport_btn"):
+                st.session_state.transport += 1
+        st_folium(transport_map(to_lat, to_lon), key=f"transport_{st.session_state.transport}", width=1000, height=450)
 
     if show_attractions:
-        st.subheader("🎡 Top Attractions")
-        st_folium(attraction_map(to_lat, to_lon), width=1000, height=450)
+        col_title_attractions, col_btn_attractions = st.columns([4, 1])
+        with col_title_attractions:
+            st.subheader("🎡 Top Attractions")
+        with col_btn_attractions:
+            if st.button("🔄", key="refresh_attractions_btn"):
+                st.session_state.attractions += 1
+        st_folium(attraction_map(to_lat, to_lon), key=f"attractions_{st.session_state.attractions}", width=1000, height=450)

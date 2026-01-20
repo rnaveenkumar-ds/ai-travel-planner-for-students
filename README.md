@@ -1,122 +1,87 @@
-# 🎓 AI Travel Planner for Students
 
-A **Streamlit-based AI Travel Planner** that helps students create **budget-friendly, real, and day-wise travel plans** using **live map data**, **real hotels**, and **nearby attractions** — all without paid APIs.
+# 🌍 AI Travel Planner for Students 🎓
 
----
-
-## 🚀 Project Overview
-
-Planning trips can be stressful for students due to limited budgets and lack of personalized guidance.
-This project solves that problem by providing:
-
-* 📍 **Real destination-based planning**
-* 🗓 **Day-by-day itinerary**
-* 🏨 **Real hotels & hostels**
-* 🎡 **Nearby attractions**
-* 🚕 **Public transport locations**
-* 🗺 **Interactive maps**
-* 🔄 **One-click reset**
-
-Built with **Python + Streamlit + OpenStreetMap (Overpass API)** and runs smoothly in **VS Code**.
+An **AI-powered, student-friendly travel planning application** built with **Streamlit**, **OpenStreetMap**, and **Wikidata** that generates **real, budget-aware travel plans with interactive maps** — all using **free APIs (no billing required)**.
 
 ---
 
-## ✨ Key Features
+## 🚀 Features
 
-### 🧠 Smart Day-Wise Travel Plan
+✨ **Smart Day-wise Travel Plan**
 
-* Automatically divides the trip into **morning, afternoon, and evening**
-* Suggests **real places to visit each day**
-* Calculates **budget per day per person**
+* Morning, Afternoon & Evening activities
+* Budget-aware suggestions
+* Student-friendly itineraries
 
-### 🏨 Real Hotels & Hostels
+🗺️ **Interactive Maps**
 
-* Fetches **actual hotel and hostel names**
-* Displayed on an **interactive map** with clustered markers
+* Destination map
+* Attractions map
+* Hotels map
+* Transportation map
 
-### 🎡 Tourist Attractions
+📍 **Real Place Names (No Dummy Data)**
 
-* Monuments, parks, attractions, and marketplaces
-* Based on **real OpenStreetMap data**
+* OpenStreetMap (OSM)
+* Wikidata enrichment for accurate attractions, parks & museums
 
-### 🚕 Public Transport Map
+🍽️ **Food Recommendations**
 
-* Shows nearby **bus stations and transport hubs**
-* Helps students plan **low-cost travel routes**
+* Budget-friendly local street food
+* Popular premium restaurants
 
-### 🗺 Interactive Maps
+🎛️ **Customizable Actions**
 
-* Zoomable and clickable maps using **Folium**
-* Clustered markers for cleaner visualization
+* Toggle maps as needed
+* Lightweight & fast UI
 
-### 🔄 Reset Planner
+💯 **100% Free APIs**
 
-* One click to reset all inputs and results
-* Useful for demos and repeated testing
+* No OpenAI
+* No Google Maps billing
+* No paid AI services
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Technology                       | Purpose                  |
-| -------------------------------- | ------------------------ |
-| **Python**                       | Core logic               |
-| **Streamlit**                    | Web UI                   |
-| **Folium**                       | Interactive maps         |
-| **OpenStreetMap (Overpass API)** | Real-world location data |
-| **VS Code**                      | Development environment  |
+* **Python**
+* **Streamlit** – UI & deployment
+* **Folium** – Interactive maps
+* **OpenStreetMap (OSM)** – Location data
+* **Wikidata SPARQL** – Real-world place enrichment
+* **Requests** – API calls
 
 ---
 
-## 📂 Project Structure
+## 📸 Screenshots (Optional)
+
+> Add screenshots or GIFs here for better visibility
+> Example:
 
 ```
-AI_Travel_Planner/
-│
-├── app.py          # Main Streamlit application
-├── README.md       # Project documentation
-├── requirements.txt
-└── .venv/          # Virtual environment
+/assets/home.png
+/assets/maps.gif
 ```
 
 ---
 
-## ⚙️ Installation & Setup (VS Code)
+## ⚙️ Installation & Setup
 
 ### 1️⃣ Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/AI_Travel_Planner.git
-cd AI_Travel_Planner
+git clone https://github.com/your-username/ai-travel-planner.git
+cd ai-travel-planner
 ```
 
-### 2️⃣ Create Virtual Environment
+### 2️⃣ Install Dependencies
 
 ```bash
-python -m venv .venv
+pip install -r requirements.txt
 ```
 
-### 3️⃣ Activate Environment
-
-**Windows (PowerShell):**
-
-```bash
-.venv\Scripts\activate
-```
-
-> If script execution is blocked:
-
-```bash
-Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
-```
-
-### 4️⃣ Install Dependencies
-
-```bash
-pip install streamlit folium streamlit-folium requests
-```
-
-### 5️⃣ Run the App
+### 3️⃣ Run the App
 
 ```bash
 streamlit run app.py
@@ -124,77 +89,67 @@ streamlit run app.py
 
 ---
 
-## 🧪 How to Use
+## 📦 requirements.txt
 
-1. Enter a **destination** (e.g., Manali)
-2. Select **number of days**
-3. Enter **total budget**
-4. Choose **number of members**
-5. Click **✨ Generate Plan**
-6. Enable maps using checkboxes
-7. Use **🔄 Reset Planner** to start over
-
----
-
-## 📸 Output Includes
-
-* 📄 **Detailed day-wise itinerary**
-* 🏨 **Hotels map**
-* 🚕 **Transport map**
-* 🎡 **Attractions map**
+```txt
+streamlit
+folium
+streamlit-folium
+requests
+geopy
+tenacity
+```
 
 ---
 
-## 🔒 API Information
+## 🧠 How It Works
 
-✅ **No paid APIs used**
-✅ Uses **free OpenStreetMap Overpass API**
-✅ No API keys required
+1. User selects destination, budget, days, and group size
+2. App fetches:
 
----
-
-## 📈 Future Enhancements
-
-* 🌐 Auto-detect any city worldwide
-* 🧭 Route & distance optimization
-* 📊 Budget charts and analytics
-* 📱 Mobile UI optimization
-* 🤖 ML-based preference learning
-* 🏕 Category-based travel (adventure, culture, relaxation)
+   * Locations from **OpenStreetMap**
+   * Missing/real names from **Wikidata**
+3. AI logic generates a **structured day-wise plan**
+4. Maps are displayed interactively based on selected actions
 
 ---
 
-## 🙌 Acknowledgements
+## 🌟 Why This Project?
 
-* OpenStreetMap Community
-* Streamlit Team
-<<<<<<< HEAD
-* Folium Contributors
-=======
-* Folium Contributors
-  
+✔ Perfect for **students**
+✔ Ideal for **hackathons & resumes**
+✔ Uses **real-world data**
+✔ Zero API cost
+✔ Easy to extend
+
 ---
 
 ## 🔮 Future Scope
 
-While the **AI Travel Planner for Students** is fully functional and helpful, there are several ways it can be **enhanced and expanded** in the future:
-
-* 🌐 **Global Destination Support** – Automatically detect and plan trips for **any city worldwide**.
-* 🧭 **Route & Distance Optimization** – Suggest **shortest routes** between attractions to save time and money.
-* 📊 **Budget Analytics** – Provide **charts and graphs** for daily and overall spending.
-* 🏕 **Category-Based Travel** – Personalized itineraries for **adventure, cultural, or relaxation trips**.
-* 🤖 **AI-Powered Recommendations** – Use ML or LLMs to suggest **places, hotels, and activities** based on user preferences.
-* 📱 **Mobile-Friendly UI** – Optimized interface for **smartphones and tablets**.
-* 🌦 **Dynamic Weather Integration** – Incorporate **forecast-based activity suggestions**.
-* 🚌 **Transport Routing** – Include **bus, train, or metro routes** with estimated travel times.
+* 🤖 AI-based personalized recommendations
+* 💬 Chat-style travel assistant
+* 🧾 PDF itinerary download
+* 🌐 Multi-language support
+* 📱 Mobile-first UI improvements
+* 🌦️ Weather-aware planning
 
 ---
 
-## 📝 Conclusion
+## 🤝 Contributing
 
-The **AI Travel Planner for Students** is a **lightweight, interactive, and fully free tool** that simplifies trip planning for students. By integrating **real-world data, interactive maps, and personalized day-wise itineraries**, it allows users to:
+Contributions are welcome!
 
-* Save time and reduce stress while planning trips
-* Optimize budget per person and per day
-* Explore attractions, hotels, and transport options with ease
->>>>>>> a47fb5663b5560a5874c229b3dd62bdf700c0352
+1. Fork the repository
+2. Create a new branch
+3. Commit your changes
+4. Open a pull request
+---
+
+## 🙌 Acknowledgements
+
+* OpenStreetMap Contributors
+* Wikidata Community
+* Streamlit Team
+✅ Conclusion
+
+The AI Travel Planner for Students demonstrates how free, open-source data and smart AI logic can be combined to build a real-world, budget-friendly travel planning solution. By leveraging OpenStreetMap and Wikidata, the application avoids paid APIs while still delivering accurate locations, meaningful recommendations, and interactive maps.
